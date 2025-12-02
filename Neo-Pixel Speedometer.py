@@ -27,3 +27,5 @@ while True: #Opdatere NeoPixel diodes depending på speed_level
 
     sleep(0.2)
 
+while True:
+    print('suck my dick')

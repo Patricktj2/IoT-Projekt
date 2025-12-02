@@ -5,7 +5,7 @@ from time import sleep
 no_of_pixels = 12
 np = NeoPixel(Pin(12, Pin.OUT), no_of_pixels)
 
-def speed_level(speed_value):
+def speed_level(speed_value): #Definere hvad der skal gøres med speed_value fra IMU
     for i in range(no_of_pixels):
         if i < speed_value:
             np[i] = (255,255,255)

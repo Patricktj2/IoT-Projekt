@@ -16,7 +16,7 @@ def speed_level(speed_value): #Definere hvad der skal gøres med speed_value fra
 value = 0
 direction = 1
 
-while True:
+while True: #Opdatere NeoPixel diodes depending på speed_level
     speed_level(value)
     value += direction
 

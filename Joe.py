@@ -1,1 +1,0 @@
-print("Din mor")

@@ -3,24 +3,26 @@ from neopixel import NeoPixel
 from time import sleep
 
 no_of_pixels = 12
+np = NeoPixel(Pin(12, Pin.OUT), no_of_pixels)
 
-np = NeoPixel(Pin(12, Pin.OUT), no_of_pixels) #Definere neopixel på pin med no_of_pixels
-
-
-for led in range(no_of_pixels): #Intitiater lys på dioderne
-    np[led] = (0,0,0)
-np[1] = (0,0,0)
-np.write()
-sleep(0.3)
-
-pcounter = 0
-
-while True: #Tænder NeoPixel dioderne en af gangen
+def speed_level(speed_value): #Definere hvad der skal gøres med speed_value fra IMU
     for i in range(no_of_pixels):
-        np[i] = (0,0,0)
-    np[pcounter] = (255,255,255)
+        if i < speed_value:
+            np[i] = (255,255,255)
+        else:
+            np[i] = (0,0,0)
     np.write()
-    pcounter +=1 #fjern + og indsæt speed value
-    if pcounter == 12:
-        pcounter = 0
-    sleep(0.3) #Sleep skal nok fjernes
+
+value = 0
+direction = 1
+
+while True: #Opdatere NeoPixel diodes depending på speed_level
+    speed_level(value)
+    value += direction
+
+    if value >= no_of_pixels:
+        direction = -1
+    if value <= 0:
+        direction = 1
+
+    sleep(0.2)

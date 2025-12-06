@@ -48,7 +48,7 @@ def alarm():
         buzz.duty_u16(0)       # off
         sleep(0.5)
 
-        # Forsætter med at tjekke beskeder fra thingsboard
+        # Forsætter med at tjekke beskeder fra thingsboard så den kan slukkes igen
         client.check_msg() 
         client.set_server_side_rpc_request_handler(rpc_request)
     

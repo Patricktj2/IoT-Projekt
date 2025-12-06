@@ -1,2 +1,3 @@
 Epic IoT projekt
-![hippo](https://media3.giphy.com/media/aUovxH8Vf9qDu/giphy.gif)
+
+![hippo](https://media.tenor.com/0da8kM1dFaYAAAAi/dance-funny.gif)

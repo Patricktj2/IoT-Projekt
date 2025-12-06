@@ -1,20 +1,3 @@
-# -*- coding: utf-8 -*-
-#
-# Copyright 2024 Kevin Lindemark
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, see <http://www.gnu.org/licenses/>.
-
 from uthingsboard.client import TBDeviceMqttClient
 from time import sleep
 from machine import reset, UART, Pin, PWM
@@ -32,27 +15,29 @@ gpsAllNMEA = False                          # Enable all NMEA frames: True or Fa
 uart = UART(gpsPort, gpsSpeed)              # UART object creation
 led = Pin(12, Pin.OUT)
 buzz = PWM(Pin(21))
-buzz.freq(1000)       # loud frequency
-buzz.duty_u16(0)      # start silent
+buzz.freq(1000)                             # loud frequency
+buzz.duty_u16(0)                            # start silent
 gps = GPS_SIMPLE(uart, gpsAllNMEA)          # GPS object creation
 threaded = False                            # Use threaded (True) or loop (False)
 
 ref_lat = None
 ref_lon = None
 
+# Håndtere requests fra thingsboard serveren
 def rpc_request(req_id, method, params):
     """handler callback to recieve RPC from server """
     global alarm_enabled
     print(f'Response {req_id}: {method}, params {params}')
     print(params, "params type:", type(params))
     try:
-        # check if the method is "toggle_led1" (needs to be configured on thingsboard dashboard)
+        # Tjekker om method alarmtrigger er toggled på thingsboard
         if method == "alarmtrigger":
-            # check if the value is is "led1 on"
+            # Tjekker parameters af alarmtrigger fra thingsboard
             alarm_enabled = params
     except Exception as e:
         print("RPC handler error:", e)
 
+# Alarm funktionen
 def alarm():
     while alarm_enabled:
         led.value(1)
@@ -62,11 +47,13 @@ def alarm():
         led.value(0)
         buzz.duty_u16(0)       # off
         sleep(0.5)
-        client.check_msg()
+
+        # Forsætter med at tjekke beskeder fra thingsboard
+        client.check_msg() 
         client.set_server_side_rpc_request_handler(rpc_request)
     
-    
-def distance_m(lat1, lon1, lat2, lon2):
+# Udregner distancen mellem to punkter (lon og lat) og konvertere det til meter    
+def distance_m(lat1, lon1, lat2, lon2):    
     
     R = 6371000 
     phi1 = radians(lat1)
@@ -77,12 +64,13 @@ def distance_m(lat1, lon1, lat2, lon2):
     a = sin(dphi/2)**2 + cos(phi1) * cos(phi2) * sin(dlambda/2)**2
     c = 2 * atan2(sqrt(a), sqrt(1 - a))
     return R * c
-    #Bliver brugt til at udregne distancen mellem to punkter (lon og lat)
 
 
+# Sætter start position og trigger alarmen hvis cyklen bevæger sig x meter fra den position
 def alarmtrigger_step():
     global ref_lat, ref_lon
-    if (gps.receive_nmea_data(gpsEcho)):
+    # Får data fra gps modulet
+    if (gps.receive_nmea_data(gpsEcho)): 
         gps.get_latitude()
         gps.get_longitude()
     
@@ -90,13 +78,13 @@ def alarmtrigger_step():
         "Latitude": gps.get_latitude(),
         "Longitude": gps.get_longitude()
     }
-    #Starter ikke programmet hvis ingen lokation er fundet
-    if Location["Latitude"] == -999 or Location["Longitude"] == -999:
+    # Starter ikke programmet hvis ingen sattelit er fundet
+    if Location["Latitude"] == -999 or Location["Longitude"] == -999: 
         print("Uh oh no sattelite found oopsie woopsie")
         sleep(0.5)
         return False
 
-    # Set reference position once (on first valid fix)
+    # Indstiller reference position 
     if ref_lat is None:
         ref_lat = Location["Latitude"]
         ref_lon = Location["Longitude"]
@@ -104,13 +92,14 @@ def alarmtrigger_step():
         sleep(0.5)
         return False
 
+    # Udregner distancen fra reference positionen
     dist = distance_m(ref_lat, ref_lon,
                       Location["Latitude"], Location["Longitude"])
 
     print("Current:", Location.values(), "Distance (m):", dist)
     sleep(0.5)
 
-    # Her kan der indstilles hvor langt cyklen må flytte sig i meter
+    # Her kan der indstilles hvor langt cyklen må flytte sig i meter før alarmen starter
     if dist > 1:
         alarm()
     
@@ -120,11 +109,12 @@ def alarmtrigger_step():
 
 
 
-
+# Connecter til thingsboard serveren
 client = TBDeviceMqttClient(secrets.SERVER_IP_ADDRESS, access_token = secrets.ACCESS_TOKEN)
 client.connect()                           # Connecting to ThingsBoard 
 print("connected to thingsboard, starting to send and receive data")
 
+# Loop som gør den hele tiden får requests fra serveren/tænder for alarmen hvis triggered fra dashboardet
 while True:
     client.check_msg()
     client.set_server_side_rpc_request_handler(rpc_request)

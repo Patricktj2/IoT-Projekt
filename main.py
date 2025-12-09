@@ -28,7 +28,7 @@ led = Pin(12, Pin.OUT)
 buzz = PWM(Pin(21))
 buzz.freq(1000)       # loud frequency
 buzz.duty_u16(0)      # start silent
-threaded = False                            # Use threaded (True) or loop (False)
+
 
 # Laver lcd object
 lcd = GpioLcd(rs_pin=Pin(27), enable_pin=Pin(25), d4_pin=Pin(33),

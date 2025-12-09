@@ -1,11 +1,10 @@
 from uthingsboard.client import TBDeviceMqttClient
 from time import sleep, ticks_ms
-from machine import reset, UART, Pin, PWM
+from machine import UART, Pin, PWM
 from gps_simple import GPS_SIMPLE
 from math import sin, cos, sqrt, atan2, radians
 from gpio_lcd import GpioLcd
 from lmt87 import LMT87
-import gc
 import secrets
 import random
 
@@ -13,7 +12,6 @@ ref_lat = None
 ref_lon = None
 
 pin_lmt87 = 35
-average = 1
 alarm_enabled = False
 temp = LMT87(pin_lmt87)
 

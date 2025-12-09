@@ -77,7 +77,7 @@ def rpc_request(req_id, method, params):
 
 # Hastighed display function
 def speed_display():
-    if (gps.recieve_nmea_data(gpsEcho)):
+    if (gps.receieve_nmea_data(gpsEcho)):
         lcd.move_to(0,0)
         lcd.putstr(gps.get_speed())
 
@@ -113,7 +113,6 @@ def temp_display():
                             0b00000,
                             0b00000])
 
-    adc_val = temp.get_adc_value()
     temperature = temp.get_temperature()
     
     client.send_telemetry({"temperature": temperature})
@@ -187,6 +186,7 @@ def alarmtrigger_step():
     # Her kan der indstilles hvor langt cyklen må flytte sig i meter
     if dist > 1:
         alarm()
+        return True
         
     return False
 

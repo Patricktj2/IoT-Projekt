@@ -1,11 +1,11 @@
 from uthingsboard.client import TBDeviceMqttClient
 from time import sleep, ticks_ms
-from machine import reset, UART, Pin, PWM
+from machine import UART, Pin, PWM
+from neopixel import NeoPixel
 from gps_simple import GPS_SIMPLE
 from math import sin, cos, sqrt, atan2, radians
 from gpio_lcd import GpioLcd
 from lmt87 import LMT87
-import gc
 import secrets
 import random
 
@@ -13,7 +13,6 @@ ref_lat = None
 ref_lon = None
 
 pin_lmt87 = 35
-average = 1
 alarm_enabled = False
 temp = LMT87(pin_lmt87)
 
@@ -24,16 +23,20 @@ gpsEcho = False                             # Echo NMEA frames: True or False
 gpsAllNMEA = False                          # Enable all NMEA frames: True or False
 uart = UART(gpsPort, gpsSpeed)              # UART object creation
 gps = GPS_SIMPLE(uart, gpsAllNMEA)          # GPS object creation
-led = Pin(12, Pin.OUT)
-buzz = PWM(Pin(21))
+led = Pin(19, Pin.OUT)
+buzz = PWM(Pin(15))
 buzz.freq(1000)       # loud frequency
 buzz.duty_u16(0)      # start silent
-threaded = False                            # Use threaded (True) or loop (False)
+
 
 # Laver lcd object
 lcd = GpioLcd(rs_pin=Pin(27), enable_pin=Pin(25), d4_pin=Pin(33),
                d5_pin=Pin(32), d6_pin=Pin(21), d7_pin=Pin(22), num_lines=4,
               num_columns=20)
+
+# NeoPixel shit
+np = NeoPixel(Pin(26, Pin.OUT),2)
+rgb = [0, 255]
 
 # Tænder og clearer displayet når koden starter
 lcd.backlight_on()
@@ -79,7 +82,7 @@ def rpc_request(req_id, method, params):
 
 # Hastighed display function
 def speed_display():
-    if (gps.recieve_nmea_data(gpsEcho)):
+    if (gps.receieve_nmea_data(gpsEcho)):
         lcd.move_to(0,0)
         lcd.putstr(gps.get_speed())
 
@@ -115,7 +118,6 @@ def temp_display():
                             0b00000,
                             0b00000])
 
-    adc_val = temp.get_adc_value()
     temperature = temp.get_temperature()
     
     client.send_telemetry({"temperature": temperature})
@@ -131,11 +133,13 @@ def temp_display():
 # Selve alarm funktionen
 def alarm():
     while alarm_enabled:
-        led.value(1)
+        np.fill((255, 0, 0))
+        np.write()
         buzz.duty_u16(40000)   # loud volume (max ~65535)
         sleep(1)
 
-        led.value(0)
+        np.fill((0,0,0))
+        np.write()
         buzz.duty_u16(0)       # off
         sleep(0.5)
         client.check_msg()
@@ -187,8 +191,9 @@ def alarmtrigger_step():
     sleep(0.5)
 
     # Her kan der indstilles hvor langt cyklen må flytte sig i meter
-    if dist > 1:
+    if dist > 3:
         alarm()
+        return True
         
     return False
 

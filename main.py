@@ -23,7 +23,7 @@ gpsAllNMEA = False                          # Enable all NMEA frames: True or Fa
 uart = UART(gpsPort, gpsSpeed)              # UART object creation
 gps = GPS_SIMPLE(uart, gpsAllNMEA)          # GPS object creation
 led = Pin(12, Pin.OUT)
-buzz = PWM(Pin(21))
+buzz = PWM(Pin(15))
 buzz.freq(1000)       # loud frequency
 buzz.duty_u16(0)      # start silent
 

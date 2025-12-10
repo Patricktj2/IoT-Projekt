@@ -4,10 +4,10 @@ from machine import Pin
 from gpio_lcd import GpioLcd
 
 
-x1=1670
+x1=1430
 #3v
 y1=0
-x2=2440q
+x2=2260
 #4,2
 y2=100
 

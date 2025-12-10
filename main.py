@@ -6,6 +6,7 @@ from gps_simple import GPS_SIMPLE
 from math import sin, cos, sqrt, atan2, radians
 from gpio_lcd import GpioLcd
 from lmt87 import LMT87
+from adc_sub import ADC_substitute
 import secrets
 import random
 
@@ -27,7 +28,7 @@ led = Pin(19, Pin.OUT)
 buzz = PWM(Pin(15))
 buzz.freq(1000)       # loud frequency
 buzz.duty_u16(0)      # start silent
-
+adc = ADC_substitute(34)
 
 # Laver lcd object
 lcd = GpioLcd(rs_pin=Pin(27), enable_pin=Pin(25), d4_pin=Pin(33),
@@ -48,6 +49,17 @@ client = TBDeviceMqttClient(secrets.SERVER_IP_ADDRESS, access_token = secrets.AC
 client.connect()
 print("Forbundet til thingsboard")
 
+# Batteri måler calibration values
+x1=1670
+#3v
+y1=0
+x2=2440
+#4,2
+y2=100
+
+a= (y2-y1)/(x2-x1)
+b = y2 - a*x2
+
 # En class til en non blocking timer
 class timer:
     def __init__(self, delay_period_ms):
@@ -63,6 +75,7 @@ class timer:
 display_test_timer = timer(200)
 temp_display_timer = timer(500)
 gps_module_timer = timer(1000)
+batteri_måler_timer = timer(500)
 
 # Thingsboard functions
 def rpc_request(req_id, method, params):
@@ -77,7 +90,33 @@ def rpc_request(req_id, method, params):
             alarm_enabled = params
     except Exception as e:
         print("RPC handler error:", e)
-        
+
+# Batteri formel function
+def formel_batt(x):
+    y= a*x+b # y = 0,159x - 255,962 det er formlen vha. aflæsning af ADC-værdi til at finde en lineær funktion
+    return int(y) #laver vores batteristatus om til integer(hel tal)
+
+# Funktion for selve måleren
+def batteri_måler():
+    adc_val = adc.read_adc()
+    v = adc.read_voltage()
+    batt_percentage = formel_batt(adc_val)
+    
+    custom_chr = bytearray([0b01110,
+                            0b11111,
+                            0b10101,
+                            0b11001,
+                            0b10011,
+                            0b10101,
+                            0b11001,
+                            0b11111])
+    lcd.move_to(19, 0)
+    lcd.custom_char(1, custom_chr)
+    lcd.putchar(chr(1))
+    
+    lcd.move_to(16,0)
+    lcd.putstr(f'{batt_percentage}')
+
 ## Display functions##
 
 # Hastighed display function
@@ -203,6 +242,7 @@ try:
         temp_display_timer.non_blocking_timer(temp_display)
         display_test_timer.non_blocking_timer(display_test)
         gps_module_timer.non_blocking_timer(gps_module)
+        batteri_måler_timer.non_blocking_timer(batteri_måler)
         
         client.check_msg()
         client.set_server_side_rpc_request_handler(rpc_request)

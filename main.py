@@ -75,9 +75,9 @@ class timer:
 
 # Non blocking timers til de forskellige functions, skrives sådan: "selv lavet timer".non_blocking_timer("function man skal køre")
 display_test_timer = timer(200)
-temp_display_timer = timer(500)
-gps_module_timer = timer(1000)
-batteri_måler_timer = timer(500)
+temp_display_timer = timer(1000)
+gps_module_timer = timer(10000)
+batteri_måler_timer = timer(1000)
 afk_warning_timer = timer(1000)
 
 # Thingsboard functions

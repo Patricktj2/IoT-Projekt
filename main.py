@@ -17,6 +17,8 @@ pin_lmt87 = 35
 alarm_enabled = False
 temp = LMT87(pin_lmt87)
 
+afk_timer = 180
+
 # Gps/buzzer/led stuff
 gpsPort = 2                                 # ESP32 UART port, Educaboard ESP32 default UART port
 gpsSpeed = 9600                             # UART speed, defauls u-blox speed
@@ -76,6 +78,7 @@ display_test_timer = timer(200)
 temp_display_timer = timer(500)
 gps_module_timer = timer(1000)
 batteri_måler_timer = timer(500)
+afk_warning_timer = timer(1000)
 
 # Thingsboard functions
 def rpc_request(req_id, method, params):
@@ -114,8 +117,10 @@ def batteri_måler():
     lcd.custom_char(1, custom_chr)
     lcd.putchar(chr(1))
     
-    lcd.move_to(16,0)
-    lcd.putstr(f'{batt_percentage}')
+    lcd.move_to(15,0)
+    lcd.putstr(f'{batt_percentage}%')
+    
+    client.send_telemetry({"Batteri": batt_percentage})
 
 ## Display functions##
 
@@ -137,6 +142,7 @@ def gps_module():
         lcd.move_to(0, 0)
         lcd.putstr("%d m/s" % gps.get_speed())
         
+        print("Speed:", gps.get_speed(), "Lat:", gps.get_latitude(), "Lon:", gps.get_longitude(), "Course:", gps.get_course())
         
         
         client.send_telemetry({
@@ -200,7 +206,7 @@ def distance_m(lat1, lon1, lat2, lon2):
 
 # Funktion som trigger alarmen
 def alarmtrigger_step():
-    global ref_lat, ref_lon
+    global ref_lat, ref_lon, dist
     if (gps.receive_nmea_data(gpsEcho)):
         gps.get_latitude()
         gps.get_longitude()
@@ -236,6 +242,25 @@ def alarmtrigger_step():
         
     return False
 
+# Function til hvis cykel er afk i 3 min
+def afk_warning():
+    global dist, afk_timer, alarm_enabled
+    if gps.get_latitude() and gps.get_longitude() == ref_lat and ref_lon:
+        try: 
+            if dist <= 10 and alarm_enabled == False:
+                if afk_timer > 0:
+                    mins, secs = divmod(afk_timer, 60)
+                    timeformat = "{02d}:{:02d}".format(mins, secs)
+                    print(timeformat, end="/r")
+                    afk_timer -= 1
+                    
+                if afk_timer <= 0:
+                    alarm_enabled = True
+            
+        except NameError:
+            pass
+        client.send_telemetry({"Alarm_timer": afk_timer})
+    
 # Intiater functions og sender data til thingsboard
 try:
     while True:
@@ -243,6 +268,8 @@ try:
         display_test_timer.non_blocking_timer(display_test)
         gps_module_timer.non_blocking_timer(gps_module)
         batteri_måler_timer.non_blocking_timer(batteri_måler)
+        afk_warning_timer.non_blocking_timer(afk_warning)
+        
         
         client.check_msg()
         client.set_server_side_rpc_request_handler(rpc_request)

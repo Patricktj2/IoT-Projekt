@@ -19,50 +19,41 @@ temp = LMT87(pin_lmt87)
 
 afk_timer = 180
 
-# Gps/buzzer/led stuff
-gpsPort = 2                                 # ESP32 UART port, Educaboard ESP32 default UART port
-gpsSpeed = 9600                             # UART speed, defauls u-blox speed
-gpsEcho = False                             # Echo NMEA frames: True or False
-gpsAllNMEA = False                          # Enable all NMEA frames: True or False
-uart = UART(gpsPort, gpsSpeed)              # UART object creation
-gps = GPS_SIMPLE(uart, gpsAllNMEA)          # GPS object creation
+gpsPort = 2                                 
+gpsSpeed = 9600                             
+gpsEcho = False                             
+gpsAllNMEA = False                         
+uart = UART(gpsPort, gpsSpeed)             
+gps = GPS_SIMPLE(uart, gpsAllNMEA)          
 led = Pin(19, Pin.OUT)
 buzz = PWM(Pin(15))
-buzz.freq(1000)       # loud frequency
-buzz.duty_u16(0)      # start silent
+buzz.freq(1000)      
+buzz.duty_u16(0)      
 adc = ADC_substitute(34)
 
-# Laver lcd object
 lcd = GpioLcd(rs_pin=Pin(27), enable_pin=Pin(25), d4_pin=Pin(33),
                d5_pin=Pin(32), d6_pin=Pin(21), d7_pin=Pin(22), num_lines=4,
               num_columns=20)
 
-# NeoPixel shit
 np = NeoPixel(Pin(26, Pin.OUT),2)
 rgb = [0, 255]
 
-# Tænder og clearer displayet når koden starter
 lcd.backlight_on()
 lcd.display_on()
 lcd.clear()
 
-# Forbinder til thingsboard
 client = TBDeviceMqttClient(secrets.SERVER_IP_ADDRESS, access_token = secrets.ACCESS_TOKEN)
 client.connect()
 print("Forbundet til thingsboard")
 
-# Batteri måler calibration values
 x1=1670
-#3v
 y1=0
 x2=2440
-#4,2
 y2=100
 
 a= (y2-y1)/(x2-x1)
 b = y2 - a*x2
 
-# En class til en non blocking timer
 class timer:
     def __init__(self, delay_period_ms):
         self.start_time = ticks_ms()
@@ -70,36 +61,31 @@ class timer:
     
     def non_blocking_timer(self, func):
         if ticks_ms() - self.start_time > self.delay_period_ms:
-            func() # Starter funktionen når tiden er gået
-            self.start_time = ticks_ms() # Genstarter tiden
-
-# Non blocking timers til de forskellige functions, skrives sådan: "selv lavet timer".non_blocking_timer("function man skal køre")
+            func() 
+            self.start_time = ticks_ms() 
+          
 display_test_timer = timer(200)
 temp_display_timer = timer(1000)
 gps_module_timer = timer(10000)
 batteri_måler_timer = timer(1000)
 afk_warning_timer = timer(1000)
 
-# Thingsboard functions
 def rpc_request(req_id, method, params):
     """handler callback to recieve RPC from server """
     global alarm_enabled
     print(f'Response {req_id}: {method}, params {params}')
     print(params, "params type:", type(params))
+  
     try:
-        # check if the method is "toggle_led1" (needs to be configured on thingsboard dashboard)
         if method == "alarmtrigger":
-            # check if the value is is "led1 on"
             alarm_enabled = params
     except Exception as e:
         print("RPC handler error:", e)
 
-# Batteri formel function
 def formel_batt(x):
-    y= a*x+b # y = 0,159x - 255,962 det er formlen vha. aflæsning af ADC-værdi til at finde en lineær funktion
-    return int(y) #laver vores batteristatus om til integer(hel tal)
+    y= a*x+b 
+    return int(y)
 
-# Funktion for selve måleren
 def batteri_måler():
     adc_val = adc.read_adc()
     v = adc.read_voltage()
@@ -121,10 +107,7 @@ def batteri_måler():
     lcd.putstr(f'{batt_percentage}%')
     
     client.send_telemetry({"Batteri": batt_percentage})
-
-## Display functions##
-
-# Hastighed display function
+  
 def speed_display():
     if (gps.receieve_nmea_data(gpsEcho)):
         lcd.move_to(0,0)

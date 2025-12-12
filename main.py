@@ -113,13 +113,11 @@ def speed_display():
         lcd.move_to(0,0)
         lcd.putstr(gps.get_speed())
 
-# Display test function
 def display_test():
     numbers = [0,1,2,3,4,5,6,7,8,9]
     lcd.move_to(19,3)
     lcd.putstr(str(random.choice(numbers)))
 
-# Gps modul function med speed, lat, long og course
 def gps_module():
     if (gps.receive_nmea_data(gpsEcho)):
         lcd.move_to(0, 0)
@@ -135,7 +133,6 @@ def gps_module():
         "course": gps.get_course()
         })
         
-# Temperatur display function
 def temp_display():
     custom_chr = bytearray([0b00010,
                             0b00101,
@@ -156,24 +153,20 @@ def temp_display():
     lcd.custom_char(0, custom_chr)
     lcd.putchar(chr(0))
 
-## Tyverialarm functions ##
-
-# Selve alarm funktionen
 def alarm():
     while alarm_enabled:
         np.fill((255, 0, 0))
         np.write()
-        buzz.duty_u16(40000)   # loud volume (max ~65535)
+        buzz.duty_u16(40000)   
         sleep(1)
 
         np.fill((0,0,0))
         np.write()
-        buzz.duty_u16(0)       # off
+        buzz.duty_u16(0)    
         sleep(0.5)
         client.check_msg()
         client.set_server_side_rpc_request_handler(rpc_request)
 
-# Udregner distance 
 def distance_m(lat1, lon1, lat2, lon2):
     
     R = 6371000 
@@ -185,9 +178,7 @@ def distance_m(lat1, lon1, lat2, lon2):
     a = sin(dphi/2)**2 + cos(phi1) * cos(phi2) * sin(dlambda/2)**2
     c = 2 * atan2(sqrt(a), sqrt(1 - a))
     return R * c
-    #Bliver brugt til at udregne distancen mellem to punkter (lon og lat)
-
-# Funktion som trigger alarmen
+  
 def alarmtrigger_step():
     global ref_lat, ref_lon, dist
     if (gps.receive_nmea_data(gpsEcho)):
@@ -198,13 +189,12 @@ def alarmtrigger_step():
         "Latitude": gps.get_latitude(),
         "Longitude": gps.get_longitude()
     }
-    #Starter ikke programmet hvis ingen lokation er fundet
+
     if Location["Latitude"] == -999 or Location["Longitude"] == -999:
         print("Uh oh no sattelite found oopsie woopsie")
         sleep(0.5)
         return False
 
-    # Set reference position once (on first valid fix)
     if ref_lat is None:
         ref_lat = Location["Latitude"]
         ref_lon = Location["Longitude"]
@@ -218,33 +208,29 @@ def alarmtrigger_step():
     print("Current:", Location.values(), "Distance (m):", dist)
     sleep(0.5)
 
-    # Her kan der indstilles hvor langt cyklen må flytte sig i meter
     if dist > 3:
         alarm()
         return True
         
     return False
 
-# Function til hvis cykel er afk i 3 min
 def afk_warning():
     global dist, afk_timer, alarm_enabled
-    if gps.get_latitude() and gps.get_longitude() == ref_lat and ref_lon:
-        try: 
-            if dist <= 10 and alarm_enabled == False:
-                if afk_timer > 0:
-                    mins, secs = divmod(afk_timer, 60)
-                    timeformat = "{02d}:{:02d}".format(mins, secs)
-                    print(timeformat, end="/r")
-                    afk_timer -= 1
-                    
-                if afk_timer <= 0:
-                    alarm_enabled = True
-            
-        except NameError:
-            pass
-        client.send_telemetry({"Alarm_timer": afk_timer})
-    
-# Intiater functions og sender data til thingsboard
+    try:
+        if not alarm_enabled and dist <= 10:
+            if afk_timer > 0:
+                mins, secs = divmod(afk_timer, 60)
+                timeformat = "{:02d}:{:02d}".format(mins, secs)
+                afk_timer -= 1
+                
+            if afk_timer <= 0:
+                alarm_enabled = True
+              
+    except NameError:
+        pass
+      
+    client.send_telemetry({"Alarm_timer": afk_timer})
+
 try:
     while True:
         temp_display_timer.non_blocking_timer(temp_display)

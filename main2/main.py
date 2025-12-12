@@ -6,7 +6,7 @@ from mpu6050 import MPU6050
 import sys
 from mpu6050 import MPU6050
 buzz = PWM(Pin(12))
-buzz.freq(3000)       # loud frequency
+buzz.freq(3000)      
 buzz.duty_u16(0)
 i2c = I2C(0)
 imu = MPU6050(i2c)
@@ -15,23 +15,22 @@ Bremse_tænd_G = -0.17
 from uthingsboard.client import TBDeviceMqttClient
 faldet = False
 
-# Laver en class som hedder timer 
 class timer:
-    def __init__(self, delay_period_ms): # Laver selve classen til en der fungere med tid
+    def __init__(self, delay_period_ms):
         self.start_time = ticks_ms() 
         self.delay_period_ms = delay_period_ms
     
-    def non_blocking_timer(self, func): # Selve den non blocking timer
+    def non_blocking_timer(self, func): 
         if ticks_ms() - self.start_time > self.delay_period_ms:
-            func() # Starter funktionen når tiden er gået
-            self.start_time = ticks_ms() # Genstarter tiden
+            func() 
+            self.start_time = ticks_ms() 
             
-test_timer = timer(1000) # Laver en timer
+test_timer = timer(1000) 
 
 def rpc_callback(req_id, method, params):
     print(f"RPC request: {method}")
     if method == "faldet":
-        # Return the current fall status
+
         client.send_rpc_reply(req_id, str(faldet).lower())
 
 client = TBDeviceMqttClient(secrets.SERVER_IP_ADDRESS, access_token = secrets.ACCESS_TOKEN)
@@ -39,13 +38,6 @@ client.connect()
 print("Forbundet til thingsboard")
 
 client.set_server_side_rpc_request_handler(rpc_callback)
-
-def time_test(): # Functionen som bruger timeren
-    print("epic")
-    
-bremselys_timer = timer(10)
-fald_timer = timer(10)
-
 
 def bremselys():
     vals = imu.get_values()
@@ -76,11 +68,10 @@ def faldalarm():
             imu.get_values()
             vals = imu.get_values()   
             tilt = (vals["acceleration z"])
-            buzz.duty_u16(40000)   # loud volume (max ~65535)
+            buzz.duty_u16(40000) 
             sleep(0.2)
-            buzz.duty_u16(0)       # off
+            buzz.duty_u16(0)       
             sleep(0.1)
-            
             
             if tilt >10000:
                 client.send_attributes({"faldet": False})

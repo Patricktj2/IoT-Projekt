@@ -17,7 +17,7 @@ pin_lmt87 = 35
 alarm_enabled = False
 temp = LMT87(pin_lmt87)
 
-afk_timer = 10
+afk_timer = 180
 
 gpsPort = 2                                 
 gpsSpeed = 9600                             

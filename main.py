@@ -17,7 +17,7 @@ pin_lmt87 = 35
 alarm_enabled = False
 temp = LMT87(pin_lmt87)
 
-afk_timer = 180
+afk_timer = 10
 
 gpsPort = 2                                 
 gpsSpeed = 9600                             
@@ -72,13 +72,27 @@ afk_warning_timer = timer(1000)
 
 def rpc_request(req_id, method, params):
     """handler callback to recieve RPC from server """
-    global alarm_enabled
+    global alarm_enabled, afk_timer
     print(f'Response {req_id}: {method}, params {params}')
     print(params, "params type:", type(params))
   
     try:
         if method == "alarmtrigger":
             alarm_enabled = params
+            
+            if not alarm_enabled:
+                print("Genstarter alarm")
+                np.fill((0,0,0))
+                np.write()
+                buzz.duty_u16(0)
+                if afk_timer >=0:
+                    afk_timer = 180
+                
+        elif method == "disable_afk":
+            print("Slukker afk alarm")
+            alarm_enabled = False
+            afk_timer = -1
+            
     except Exception as e:
         print("RPC handler error:", e)
 
@@ -122,10 +136,7 @@ def gps_module():
     if (gps.receive_nmea_data(gpsEcho)):
         lcd.move_to(0, 0)
         lcd.putstr("%d m/s" % gps.get_speed())
-        
-        print("Speed:", gps.get_speed(), "Lat:", gps.get_latitude(), "Lon:", gps.get_longitude(), "Course:", gps.get_course())
-        
-        
+         
         client.send_telemetry({
         "speed": gps.get_speed(),
         "latitude": gps.get_latitude(),
@@ -178,8 +189,8 @@ def distance_m(lat1, lon1, lat2, lon2):
     a = sin(dphi/2)**2 + cos(phi1) * cos(phi2) * sin(dlambda/2)**2
     c = 2 * atan2(sqrt(a), sqrt(1 - a))
     return R * c
-  
-def alarmtrigger_step():
+
+def distance():
     global ref_lat, ref_lon, dist
     if (gps.receive_nmea_data(gpsEcho)):
         gps.get_latitude()
@@ -192,40 +203,60 @@ def alarmtrigger_step():
 
     if Location["Latitude"] == -999 or Location["Longitude"] == -999:
         print("Uh oh no sattelite found oopsie woopsie")
-        sleep(0.5)
-        return False
+        return None
 
     if ref_lat is None:
         ref_lat = Location["Latitude"]
         ref_lon = Location["Longitude"]
         print("Reference set to:", ref_lat, ref_lon)
-        sleep(0.5)
-        return False
+        return None
 
     dist = distance_m(ref_lat, ref_lon,
                       Location["Latitude"], Location["Longitude"])
+    return dist
 
-    print("Current:", Location.values(), "Distance (m):", dist)
-    sleep(0.5)
-
-    if dist > 3:
+def alarmtrigger_step():
+    current_dist = distance()
+    print(f"Dist:{current_dist}m")
+    sleep(1)
+    if current_dist == None:
+        return False
+    
+    if current_dist > 1:
         alarm()
         return True
         
     return False
 
 def afk_warning():
-    global dist, afk_timer, alarm_enabled
+    global afk_timer, alarm_enabled
+    
+    if afk_timer < 0:
+        return
+    
     try:
-        if not alarm_enabled and dist <= 10:
-            if afk_timer > 0:
-                mins, secs = divmod(afk_timer, 60)
-                timeformat = "{:02d}:{:02d}".format(mins, secs)
-                afk_timer -= 1
-                
-            if afk_timer <= 0:
-                alarm_enabled = True
-              
+        if not alarm_enabled:
+            current_dist = distance()
+            
+            if current_dist == None:
+                print("Damn, no sattelite :(")
+                return
+            
+            print(f"Dist:{current_dist}m, Timer:{afk_timer}")
+            
+            if current_dist <= 10:
+                if afk_timer > 0:
+                    mins, secs = divmod(afk_timer, 60)
+                    timeformat = "{:02d}:{:02d}".format(mins, secs)
+                    afk_timer -= 1
+                    
+                if afk_timer <= 0:
+                    print("Timer alarm enabled")
+                    alarm_enabled = True
+             
+            else:
+                ref_lat = None
+                ref_lon = None
     except NameError:
         pass
       
@@ -247,11 +278,12 @@ try:
             triggered = alarmtrigger_step()
             if triggered:
                 print("ALARM TRIGGERED") 
-            alarmtrigger_step()
             continue
             
 except KeyboardInterrupt:
     print("No more banana :(")
+    np.fill((0,0,0))
+    np.write()
     
 finally:
     lcd.display_off()

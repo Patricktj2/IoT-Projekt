@@ -7,8 +7,10 @@ from math import sin, cos, sqrt, atan2, radians
 from gpio_lcd import GpioLcd
 from lmt87 import LMT87
 from adc_sub import ADC_substitute
+from umqtt.simple import MQTTClient
 import secrets
 import random
+import network
 
 ref_lat = None
 ref_lon = None
@@ -63,8 +65,7 @@ class timer:
         if ticks_ms() - self.start_time > self.delay_period_ms:
             func() 
             self.start_time = ticks_ms() 
-          
-display_test_timer = timer(200)
+main_timer = timer(10000)
 temp_display_timer = timer(1000)
 gps_module_timer = timer(10000)
 batteri_måler_timer = timer(1000)
@@ -96,6 +97,145 @@ def rpc_request(req_id, method, params):
     except Exception as e:
         print("RPC handler error:", e)
 
+def wifi_connect():
+    wlan = network.WLAN(network.STA_IF)
+    wlan.active(True)
+
+    if not wlan.isconnected():
+        print("Connecting to WiFi...")
+        wlan.connect(secrets.SSID, secrets.PASSWORD)
+        while not wlan.isconnected():
+            sleep(0.5)
+
+    print("WiFi connected:", wlan.ifconfig())
+    return wlan
+
+MQTT_CLIENT_ID = b"esp32_cykel"
+MQTT_BROKER = secrets.MQTT_SERVER
+MQTT_PORT = 1883
+MQTT_USER = secrets.MQTT_USER
+MQTT_PASSWORD = secrets.MQTT_PASSWORD
+
+TOPIC_SPEED = b"cykel/hastighed"
+TOPIC_LAT = b"cykel/latitude"
+TOPIC_LON = b"cykel/longitude"
+TOPIC_COURSE = b"cykel/course"
+TOPIC_TEMP = b"cykel/temperature"
+
+CFG_SPEED = b"homeassistant/sensor/cykel_hastighed/config"
+CFG_LAT = b"homeassistant/sensor/cykel_latitude/config"
+CFG_LON = b"homeassistant/sensor/cykel_longitude/config"
+CFG_COURSE = b"homeassistant/sensor/cykel_course/config"
+CFG_TEMP = b"homeassistant/sensor/cykel_temperature/config"
+
+def mqtt_connect():
+    client = MQTTClient(
+        client_id=MQTT_CLIENT_ID,
+        server=MQTT_BROKER,
+        port=MQTT_PORT,
+        user=MQTT_USER,
+        password=MQTT_PASSWORD,
+        keepalive=60
+    )
+    client.connect()
+    print("MQTT connected:", MQTT_BROKER)
+    return client
+
+def publish_discovery(mqtt_client):
+    # Speed (km/h)
+    mqtt_client.publish(
+        CFG_SPEED,
+        b'{"name":"Cykel Hastighed","state_topic":"cykel/hastighed",'
+        b'"unit_of_measurement":"km/h","device_class":"speed","state_class":"measurement"}',
+        retain=True
+    )
+
+    # Temperature (°C)
+    mqtt_client.publish(
+        CFG_TEMP,
+        b'{"name":"Cykel Temperatur","state_topic":"cykel/temperature",'
+        b'"unit_of_measurement":"\xc2\xb0C","device_class":"temperature","state_class":"measurement"}',
+        retain=True
+    )
+
+    # Latitude / Longitude (bare tal, measurement)
+    mqtt_client.publish(
+        CFG_LAT,
+        b'{"name":"Cykel Latitude","state_topic":"cykel/latitude","state_class":"measurement"}',
+        retain=True
+    )
+    mqtt_client.publish(
+        CFG_LON,
+        b'{"name":"Cykel Longitude","state_topic":"cykel/longitude","state_class":"measurement"}',
+        retain=True
+    )
+
+    # Course (grader, typisk 0-359)
+    mqtt_client.publish(
+        CFG_COURSE,
+        b'{"name":"Cykel Course","state_topic":"cykel/course",'
+        b'"unit_of_measurement":"\xc2\xb0","state_class":"measurement"}',
+        retain=True
+    )
+
+    print("Home Assistant discovery configs sent (retain=true)")
+
+def make_gps_sender(mqtt_client):
+    def send_gps():
+        if not gps.receive_nmea_data(gpsEcho):
+            return
+
+        speed_ms = gps.get_speed()
+        lat = gps.get_latitude()
+        lon = gps.get_longitude()
+        course = gps.get_course()
+
+        # Hvis jeres GPS_SIMPLE bruger -999 for "ingen fix"
+        if lat == -999 or lon == -999:
+            print("No valid GPS fix yet")
+            return
+
+        # speed kan også være -999, så beskyt den
+        if speed_ms != -999:
+            speed_kmh = speed_ms * 3.6
+            mqtt_client.publish(TOPIC_SPEED, "{:.1f}".format(speed_kmh))
+
+        mqtt_client.publish(TOPIC_LAT, "{:.6f}".format(lat))
+        mqtt_client.publish(TOPIC_LON, "{:.6f}".format(lon))
+
+        # course kan være float/int afhængigt af bibliotek
+        try:
+            mqtt_client.publish(TOPIC_COURSE, "{:.0f}".format(course))
+        except Exception:
+            mqtt_client.publish(TOPIC_COURSE, str(course))
+
+        print("GPS sent:", lat, lon, "speed(ms):", speed_ms, "course:", course)
+
+    return send_gps
+
+
+def make_temp_sender(mqtt_client):
+    def send_temp():
+        temperature = temp.get_temperature()
+        mqtt_client.publish(TOPIC_TEMP, str(temperature))
+        print("Temp sent:", temperature)
+
+    return send_temp
+
+def main():
+    wifi_connect()
+    mqtt_client = mqtt_connect()
+
+    # Opret sensorerne i HA (1 gang)
+    publish_discovery(mqtt_client)
+    send_gps = make_gps_sender(mqtt_client)
+    send_temp = make_temp_sender(mqtt_client)
+    send_gps()
+    send_temp()
+
+if __name__ == "__main__":
+    main()
+
 def formel_batt(x):
     y= a*x+b 
     return int(y)
@@ -126,11 +266,6 @@ def speed_display():
     if (gps.receieve_nmea_data(gpsEcho)):
         lcd.move_to(0,0)
         lcd.putstr(gps.get_speed())
-
-def display_test():
-    numbers = [0,1,2,3,4,5,6,7,8,9]
-    lcd.move_to(19,3)
-    lcd.putstr(str(random.choice(numbers)))
 
 def gps_module():
     if (gps.receive_nmea_data(gpsEcho)):
@@ -222,7 +357,7 @@ def alarmtrigger_step():
     if current_dist == None:
         return False
     
-    if current_dist > 1:
+    if current_dist > 10:
         alarm()
         return True
         
@@ -265,10 +400,10 @@ def afk_warning():
 try:
     while True:
         temp_display_timer.non_blocking_timer(temp_display)
-        display_test_timer.non_blocking_timer(display_test)
         gps_module_timer.non_blocking_timer(gps_module)
         batteri_måler_timer.non_blocking_timer(batteri_måler)
         afk_warning_timer.non_blocking_timer(afk_warning)
+        main_timer.non_blocking_timer(main)
         
         
         client.check_msg()
@@ -288,4 +423,5 @@ except KeyboardInterrupt:
 finally:
     lcd.display_off()
     lcd.backlight_off()
+
 

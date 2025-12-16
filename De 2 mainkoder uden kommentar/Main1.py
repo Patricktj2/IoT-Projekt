@@ -442,7 +442,7 @@ def afk_warning():
       
     client.send_telemetry({"Alarm_timer": afk_timer})
 
-    main()
+main()
 
 try:
     while True:

@@ -255,7 +255,6 @@ def formel_batt(x):
 
 def batteri_måler():
     adc_val = adc.read_adc()
-    v = adc.read_voltage()
     batt_percentage = formel_batt(adc_val)
     
     custom_chr = bytearray([0b01110,

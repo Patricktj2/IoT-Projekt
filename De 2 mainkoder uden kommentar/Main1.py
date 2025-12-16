@@ -317,7 +317,13 @@ def gps_module():
     if (gps.receive_nmea_data(gpsEcho)):
         lcd.move_to(0, 0)
         lcd.putstr("%d m/s" % gps.get_speed())
-         
+
+        lcd.move_to(0,1)
+        lcd.putstr("Lat: %d" % gps.get_latitude())
+
+        lcd.move_to(0,2)
+        lcd.putstr("Long: %d" % gps.get_longitude())
+      
         client.send_telemetry({
         "speed": gps.get_speed(),
         "latitude": gps.get_latitude(),

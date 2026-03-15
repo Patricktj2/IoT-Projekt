@@ -388,7 +388,7 @@ def distance():
     }
 
     if Location["Latitude"] == -999 or Location["Longitude"] == -999:
-        print("Uh oh no sattelite found oopsie woopsie")
+        print("No sattelite found")
         return None
 
     if ref_lat is None:
@@ -424,7 +424,7 @@ def afk_warning():
             current_dist = distance()
             
             if current_dist == None:
-                print("Damn, no sattelite 🙁")
+                print("No sattelite for distance calculation")
                 return
             
             print(f"Dist:{current_dist}m, Timer:{afk_timer}")
@@ -469,7 +469,7 @@ try:
         
             
 except KeyboardInterrupt:
-    print("No more banana 🙁")
+    print("Interrupted")
     np.fill((0,0,0))
     np.write()
     

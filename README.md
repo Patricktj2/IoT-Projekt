@@ -1,2 +1,2 @@
-IoT projekt - Smart Bike
+## IoT projekt - Smart Bike
 Første semester
